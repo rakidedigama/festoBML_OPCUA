@@ -1,40 +1,33 @@
 #include "festomotionlibrary.h"
 #include <stdio.h>
 #include "iostream"
+#include "fstream"
 #include <iomanip>
 #include <cstdint>
+#include "json.h"
 
 using namespace std;
 
 
-
-
 FestoMotionLibrary::FestoMotionLibrary( QObject* parent)
-    : QThread(parent)
+
 {
 
    bIsMoving = false;
    bIsEnabled = false;
+   bStopRequested = false;
+   //runPointsReady = false;
 
+   ptpPointsFromFileReady  = false;
+   ptpVelo = 20; // default velo
+   jogVelo = 20;
+   mode = 50; // default ptp
   QObject::connect(this,SIGNAL(sigUpdatePosition()),this,SLOT(updatePosition()));
 
 
 }
 
-
-
-void FestoMotionLibrary::run()
-{
-    while (true)    {
-
-        // updatePosition();
-       //emit sigUpdatePosition();
-
-    }
-}
-
-
-void FestoMotionLibrary::connect(UA_Client *someClient){
+void FestoMotionLibrary::connectPLC(UA_Client *someClient){
     client = someClient;
     UA_StatusCode retval = UA_Client_connect(client, "opc.tcp://192.168.1.21:4840");
     if(retval != UA_STATUSCODE_GOOD) {
@@ -44,8 +37,61 @@ void FestoMotionLibrary::connect(UA_Client *someClient){
     }
     else{
         cout<<"Connected to PLC"<<endl;
+//        initialize();
+
     }
 }
+
+void FestoMotionLibrary::initialize()
+{
+
+    //emit threadRunning(true);
+    //System Initialization
+    if(!(bIsEnabled&&bHomed)){
+         cout<<"SYSTEM INITIALIZATION STARTING" <<endl;
+         while(!isEnabled()){
+            cout<<"..." <<endl;
+            setEnable(true);
+          }
+          cout<<"SYSTEM ENABLED" <<endl;
+          while(!isHomed()){
+            homeSystem();
+          }
+          cout<<"SYSTEM HOMED" <<endl;
+    }
+    setPTPVelo(ptpVelo);
+    setJogVelo(jogVelo);
+
+}
+
+
+bool FestoMotionLibrary::readJsonFile(QString recipe)
+{
+    using namespace std;
+
+    //m_bStopRequested = false;
+    //if (mutex->tryLock(10))
+    {
+        Json::Value root;
+        Json::Reader reader;
+        std::ifstream test(recipe.toStdString());
+        bool parsingSuccessful = reader.parse( test, root );
+        if ( !parsingSuccessful )
+        {
+            // report to the user the failure and their locations in the document.
+            std::cout  << "Failed to parse configuration: "<< reader.getFormattedErrorMessages();
+            emit error("Failed to parse " + recipe);
+            //mutex->unlock();
+            return false;
+        }
+         points = root["points"];
+         ptpPointsFromFileReady = true;
+          cout<<"Got PTP points from File" <<endl;
+    }
+
+}
+
+
 
 void FestoMotionLibrary::setEnable(bool bEnableValue){
 
@@ -76,33 +122,17 @@ bool FestoMotionLibrary::isEnabled()
     UA_StatusCode retvalReadEnabled = UA_Client_readValueAttribute(client, nodeID, &variant);
     if(retvalReadEnabled == UA_STATUSCODE_GOOD && UA_Variant_hasScalarType(&variant,&UA_TYPES[UA_TYPES_BOOLEAN])) {
         outValue = *(bool*)variant.data;
-        cout<<"Reading Enabled state" << outValue <<"STATUS:  " <<retvalReadEnabled<<endl;
+        cout<<"Reading Enabled state" << outValue << endl ;;
         bIsEnabled = outValue;
      }
     else{
-            cout<<"Cannot access Enabled variable" <<endl;
+            cout<<"Cannot access Enabled variable"<<"STATUS CODE  " <<retvalReadEnabled<<endl;;
     }
 
     return outValue;
     UA_Variant_deleteMembers(&variant);
 
 }
-
-void FestoMotionLibrary::startPTPMotion(){
-    while(!isMoving()){
-        startMotion(false);
-        startMotion(true);
-    }
-}
-
-void FestoMotionLibrary::stopPTPMotion(){
-
-        startMotion(false);
-
-}
-
-
-
 
 void FestoMotionLibrary::startMotion(bool bStartValue)
 {
@@ -117,7 +147,7 @@ void FestoMotionLibrary::startMotion(bool bStartValue)
      while(bStartValue!=readStartMotion()){
         retvalSetEnable = UA_Client_writeValueAttribute(client,nodeID,&variant);
      }
-    cout<<"Setting Start to " << bStartValue << " STATUS   : " << retvalSetEnable<<endl;
+    cout<<"Setting Start to " << bStartValue <<endl;
 
     //UA_Variant_deleteMembers(&variant);
 }
@@ -132,17 +162,59 @@ bool FestoMotionLibrary::readStartMotion(){
     UA_StatusCode retvalReadEnabled = UA_Client_readValueAttribute(client, nodeID, &variant);
     if(retvalReadEnabled == UA_STATUSCODE_GOOD && UA_Variant_hasScalarType(&variant,&UA_TYPES[UA_TYPES_BOOLEAN])) {
         outValue = *(bool*)variant.data;
-        cout<<"Reading StartMotion state" << outValue <<"STATUS:  " <<retvalReadEnabled<<endl;
+        //cout<<"Reading StartMotion state" << outValue<< endl ;;
           bStart = outValue;
      }
     else{
-            cout<<"Cannot access Enabled variable" <<endl;
+            cout<<"Cannot access Enabled variable" <<"STATUS CODE  " <<retvalReadEnabled<<endl;;
     }
 
     return outValue;
     UA_Variant_deleteMembers(&variant);
 
 }
+
+void FestoMotionLibrary::movePositive(bool bMovePositive)
+{
+    UA_Variant variant;
+    UA_Variant_init(&variant);
+    char  symMovePos[] = "|var|CECC-X-M1.Application.GVL_Motion_INOUT.g_stIn.stCW.xMovePositive";
+    const UA_NodeId nodeID = UA_NODEID_STRING(2,symMovePos);
+
+    UA_Variant_setScalar(&variant, &bMovePositive, &UA_TYPES[UA_TYPES_BOOLEAN]);
+     UA_StatusCode retvalSetEnable;
+
+     retvalSetEnable = UA_Client_writeValueAttribute(client,nodeID,&variant);
+
+    //cout<<"Setting Start to " << bStartValue <<endl;
+}
+
+void FestoMotionLibrary::moveNegative(bool bMoveNegative)
+{
+    UA_Variant variant;
+    UA_Variant_init(&variant);
+    char  symMoveNeg[] = "|var|CECC-X-M1.Application.GVL_Motion_INOUT.g_stIn.stCW.xMoveNegative";
+    const UA_NodeId nodeID = UA_NODEID_STRING(2,symMoveNeg);
+
+    UA_Variant_setScalar(&variant, &bMoveNegative, &UA_TYPES[UA_TYPES_BOOLEAN]);
+     UA_StatusCode retvalSetEnable;
+
+     retvalSetEnable = UA_Client_writeValueAttribute(client,nodeID,&variant);
+
+}
+
+void FestoMotionLibrary::changeAxis(int axis){
+    UA_Variant variant;
+    UA_Variant_init(&variant);
+    char  symAxis[] = "|var|CECC-X-M1.Application.GVL_Motion_INOUT.g_stIn.eSelectAxis";
+    const UA_NodeId nodeID = UA_NODEID_STRING(2,symAxis);
+
+    UA_Variant_setScalar(&variant, &axis, &UA_TYPES[UA_TYPES_SBYTE]);
+     UA_StatusCode retvalSetEnable;
+
+     retvalSetEnable = UA_Client_writeValueAttribute(client,nodeID,&variant);
+}
+
 
 void FestoMotionLibrary::abort(bool bAbort)
 {
@@ -168,7 +240,7 @@ void FestoMotionLibrary::reset(bool bReset)
     UA_Variant_setScalar(&variant, &bReset, &UA_TYPES[UA_TYPES_BOOLEAN]);
 
     UA_StatusCode retvalSetEnable = UA_Client_writeValueAttribute(client,nodeID,&variant);
-    cout<<"Setting Abort to " << bReset << " STATUS   : " << retvalSetEnable<<endl;
+    cout<<"Setting Reset to " << bReset << " STATUS   : " << retvalSetEnable<<endl;
     //UA_Variant_deleteMembers(&variant);
 }
 
@@ -182,16 +254,21 @@ bool FestoMotionLibrary::isHomed()
     UA_StatusCode retvalReadEnabled = UA_Client_readValueAttribute(client, nodeID, &variant);
     if(retvalReadEnabled == UA_STATUSCODE_GOOD && UA_Variant_hasScalarType(&variant,&UA_TYPES[UA_TYPES_BOOLEAN])) {
         outValue = *(bool*)variant.data;
-        cout<<"Reading IsHomed state: " << outValue <<"STATUS  " <<retvalReadEnabled<<endl;
+        cout<<"Reading IsHomed state: " << outValue<< endl ; ;
+        bHomed = outValue;
+        if(bHomed){
+            cout<<"SYSTEM ALREADY HOMED... " <<endl;
+        }
+        else
+            cout<<"SYSTEM NOT HOMED YET" <<endl;
 
     }
     else{
-            cout<<"Cannot access IsHomed variable" <<endl;
+            cout<<"Cannot access IsHomed variable" <<"STATUS CODE  " <<retvalReadEnabled<<endl;;
     }
     return outValue;
     UA_Variant_deleteMembers(&variant);
 }
-
 
 bool  FestoMotionLibrary::isMotionComplete()
 {
@@ -204,12 +281,12 @@ bool  FestoMotionLibrary::isMotionComplete()
     if(retvalReadEnabled == UA_STATUSCODE_GOOD && UA_Variant_hasScalarType(&variant,&UA_TYPES[UA_TYPES_BOOLEAN])) {
         outValue = *(bool*)variant.data;
         if(outValue!=bMotionComplete){ // out only when changed
-            cout<<"Reading IsMotionComplete state: " << outValue <<"STATUS  " <<retvalReadEnabled<<endl;
+            cout<<"Reading IsMotionComplete state: " << outValue<< endl ; ;
         }
         bMotionComplete = outValue;
     }
     else{
-            cout<<"Cannot access IsMotionComplete variable" <<endl;
+            cout<<"Cannot access IsMotionComplete variable" <<"STATUS CODE  " <<retvalReadEnabled<<endl;;
     }
     return outValue;
     UA_Variant_deleteMembers(&variant);
@@ -223,12 +300,20 @@ bool FestoMotionLibrary::isMoving(){
     bool outValue;
     UA_StatusCode retvalReadEnabled = UA_Client_readValueAttribute(client, nodeID, &variant);
     if(retvalReadEnabled == UA_STATUSCODE_GOOD && UA_Variant_hasScalarType(&variant,&UA_TYPES[UA_TYPES_BOOLEAN])) {
+        if(bIsMoving!=outValue){ // Print output only when status changed
+            //cout<<"Reading IsMoving state: " << outValue<< endl ; ;
+        }
         outValue = *(bool*)variant.data;
-        cout<<"Reading IsMoving state: " << outValue <<"STATUS  " <<retvalReadEnabled<<endl;
-         bIsMoving = outValue;
+        bIsMoving = outValue;
+        if(bIsMoving){
+            emit moving(true);
+        }
+        else{
+            emit moving(false);
+        }
     }
     else{
-            cout<<"Cannot access IsMoving variable" <<endl;
+            cout<<"Cannot access IsMoving variable" <<"STATUS CODE  " <<retvalReadEnabled<<endl;
     }
 
     return outValue;
@@ -244,7 +329,7 @@ bool FestoMotionLibrary::isBusy(){
     UA_StatusCode retvalReadEnabled = UA_Client_readValueAttribute(client, nodeID, &variant);
     if(retvalReadEnabled == UA_STATUSCODE_GOOD && UA_Variant_hasScalarType(&variant,&UA_TYPES[UA_TYPES_BOOLEAN])) {
         outValue = *(bool*)variant.data;
-        cout<<"Reading IsBusy state: " << outValue <<"STATUS  " <<retvalReadEnabled<<endl;
+        //cout<<"Reading IsBusy state: " << outValue <<"STATUS  " <<retvalReadEnabled<<endl;
     }
     else{
             cout<<"Cannot access IsBusy variable" <<endl;
@@ -263,10 +348,10 @@ bool FestoMotionLibrary::isError(){
     UA_StatusCode retvalReadEnabled = UA_Client_readValueAttribute(client, nodeID, &variant);
     if(retvalReadEnabled == UA_STATUSCODE_GOOD && UA_Variant_hasScalarType(&variant,&UA_TYPES[UA_TYPES_BOOLEAN])) {
         outValue = *(bool*)variant.data;
-        cout<<"Reading IsError state: " << outValue <<"STATUS  " <<retvalReadEnabled<<endl;
+        cout<<"Reading IsError state: " << outValue << endl ;;
     }
     else{
-            cout<<"Cannot access IsError variable" <<endl;
+            cout<<"Cannot access IsError variable" <<"STATUS CODE  " <<retvalReadEnabled<<endl;
     }
     return outValue;
     UA_Variant_deleteMembers(&variant);
@@ -281,9 +366,21 @@ void FestoMotionLibrary::changeMOP(int modeNum){
     const UA_NodeId nodeID = UA_NODEID_STRING(2,symSetMOP);
 
     UA_Variant_setScalar(&variant, &modeNum, &UA_TYPES[UA_TYPES_SBYTE]);
+   UA_StatusCode retvalSetEnable;
+    int cMode = 0;
+    while( cMode!=modeNum){
+        setMOP(false);
+        retvalSetEnable = UA_Client_writeValueAttribute(client,nodeID,&variant); // write
+        setMOP(true);
+        cMode = viewMOP(); // read & set 'mode'
 
-    UA_StatusCode retvalSetEnable = UA_Client_writeValueAttribute(client,nodeID,&variant);
+
+    }
+
+
+
     cout<<"Change MOP to " << modeNum << " STATUS   : " << retvalSetEnable<<endl;
+
 }
 
 void FestoMotionLibrary::setMOP(bool bSetMOP){
@@ -297,10 +394,31 @@ void FestoMotionLibrary::setMOP(bool bSetMOP){
     UA_Variant_setScalar(&variant, &bSetMOP, &UA_TYPES[UA_TYPES_BOOLEAN]);
 
     UA_StatusCode retvalSetEnable = UA_Client_writeValueAttribute(client,nodeID,&variant);
-    cout<<"Setting MOP to " << bSetMOP <<"STATUS  : " << retvalSetEnable<<endl;
-    //UA_Variant_deleteMembers(&variant);
+    cout<<"Setting MOP bit to " << bSetMOP <<"STATUS  : " << retvalSetEnable<<endl;
+
 
 }
+
+int FestoMotionLibrary::viewMOP(){
+    UA_Variant variant;
+    UA_Variant_init(&variant);
+    char symMOP[] = "|var|CECC-X-M1.Application.GVL_Motion_INOUT.g_stOut.eMoPDisplay";
+    const UA_NodeId nodeID = UA_NODEID_STRING(2,symMOP);
+    int outValue;
+    UA_StatusCode retvalReadEnabled = UA_Client_readValueAttribute(client, nodeID, &variant);
+    if(retvalReadEnabled == UA_STATUSCODE_GOOD && UA_Variant_hasScalarType(&variant,&UA_TYPES[UA_TYPES_SBYTE])) {
+        outValue = *(UA_SByte*)variant.data;
+        mode = outValue;
+        cout<<"MOP: " << outValue <<endl ;
+
+    }
+    else{
+            cout<<"Cannot access MOP variable" << "STATUS CODE  " <<retvalReadEnabled<<endl;
+    }
+    return outValue;
+    UA_Variant_deleteMembers(&variant);
+}
+
 
 double FestoMotionLibrary::getActualPosX(){
 
@@ -312,11 +430,12 @@ double FestoMotionLibrary::getActualPosX(){
     UA_StatusCode retvalReadEnabled = UA_Client_readValueAttribute(client, nodeID, &variant);
     if(retvalReadEnabled == UA_STATUSCODE_GOOD && UA_Variant_hasScalarType(&variant,&UA_TYPES[UA_TYPES_DOUBLE])) {
         outValue = *(UA_Double*)variant.data;
-        cout<<"Reading actualPositionX: " << outValue <<"STATUS  " <<retvalReadEnabled<<endl;
+        cout<<"cX: " << outValue ;
+        posX = outValue;
 
     }
     else{
-            cout<<"Cannot access actualPositionX variable" <<endl;
+            cout<<"Cannot access actualPositionX variable" << "STATUS CODE  " <<retvalReadEnabled<<endl;
     }
     return outValue;
     UA_Variant_deleteMembers(&variant);
@@ -334,11 +453,12 @@ double FestoMotionLibrary::getActualPosY(){
     if(retvalReadEnabled == UA_STATUSCODE_GOOD && UA_Variant_hasScalarType(&variant,&UA_TYPES[UA_TYPES_DOUBLE])) {
 
         outValue = *(UA_Double*)variant.data;
-        cout<<"Reading actualPositionY: " << outValue <<"STATUS  " <<retvalReadEnabled<<endl;
+        cout<<", cY: " << outValue << endl ;
+        posY = outValue;
 
     }
     else{
-            cout<<"Cannot access actualPositionX variable" <<endl;
+            cout<<"Cannot access actualPositionX variable" << "STATUS CODE  " <<retvalReadEnabled<<endl;
     }
     return outValue;
     UA_Variant_deleteMembers(&variant);
@@ -356,15 +476,53 @@ double FestoMotionLibrary::getActualPosZ(){
     if(retvalReadEnabled == UA_STATUSCODE_GOOD && UA_Variant_hasScalarType(&variant,&UA_TYPES[UA_TYPES_DOUBLE])) {
 
         outValue = *(UA_Double*)variant.data;
-        //cout<<"Reading actualPositionZ: " << outValue <<"STATUS  " <<retvalReadEnabled<<endl;
+        posZ = outValue;
+        //cout<<"Reading actualPositionZ: " << outValue << endl ;;
 
     }
     else{
-            cout<<"Cannot access actualPositionX variable" <<endl;
+            cout<<"Cannot access actualPositionX variable" <<"STATUS CODE " <<retvalReadEnabled<<endl;
     }
     return outValue;
     UA_Variant_deleteMembers(&variant);
 }
+
+
+void FestoMotionLibrary::startPTPMotion(){
+    while(!isMoving()){
+        startMotion(false);
+        startMotion(true);
+    }
+}
+
+void FestoMotionLibrary::stopPTPMotion(){
+        startMotion(false);
+
+}
+
+void FestoMotionLibrary::homeSystem(){
+
+    isHomed(); // check and set homed status first
+
+    if(!bHomed){
+        if(bStart )
+            startMotion(false);   // make sure start bit is false
+    // setMOP to false
+       // setMOP(false);
+        changeMOP(20);// homing mode
+        //setMOP(true);
+        while(!isMoving()){
+            startMotion(true);
+        }
+        while(isBusy()||isMoving()){
+            cout<<"Homing in progress" <<endl;
+        }
+        cout<< "Homing Complete: " << isHomed() <<endl;
+        startMotion(false); // reset start to false
+    }
+
+}
+
 
 void FestoMotionLibrary::getActualCoordinates(double coordinates[]){
     updatePosition();
@@ -382,9 +540,6 @@ void FestoMotionLibrary::updatePosition(){
    //cout<<posX<<posY<<endl;
 }
 
-
-
-
 void FestoMotionLibrary::setPtpPosX(double ptpX){
 
 
@@ -396,7 +551,9 @@ void FestoMotionLibrary::setPtpPosX(double ptpX){
     UA_Variant_setScalar(&variant, &ptpX, &UA_TYPES[UA_TYPES_DOUBLE]);
 
     UA_StatusCode retvalSetEnable = UA_Client_writeValueAttribute(client,nodeID,&variant);
-    cout<<"Setting ptpX to " << ptpX <<" STATUS  : " << retvalSetEnable<<endl;
+    cout<<"Setting ptpX: " << ptpX ;
+    if(retvalSetEnable!=0)
+        cout<<" STATUS CODE  : " << retvalSetEnable<<endl;
     //UA_Variant_deleteMembers(&variant);
 }
 
@@ -411,8 +568,9 @@ void FestoMotionLibrary::setPtpPosY(double ptpY){
     UA_Variant_setScalar(&variant, &ptpY, &UA_TYPES[UA_TYPES_DOUBLE]);
 
     UA_StatusCode retvalSetEnable = UA_Client_writeValueAttribute(client,nodeID,&variant);
-    cout<<"Setting ptpY to " << ptpY <<" STATUS  : " << retvalSetEnable<<endl;
-    //UA_Variant_deleteMembers(&variant);
+    cout<<"ptpY: " << ptpY ;
+    if(retvalSetEnable!=0)
+        cout<<" STATUS CODE  : " << retvalSetEnable<<endl;
 }
 
 void FestoMotionLibrary::setPtpPosZ(double ptpZ){
@@ -426,8 +584,9 @@ void FestoMotionLibrary::setPtpPosZ(double ptpZ){
     UA_Variant_setScalar(&variant, &ptpZ, &UA_TYPES[UA_TYPES_DOUBLE]);
 
     UA_StatusCode retvalSetEnable = UA_Client_writeValueAttribute(client,nodeID,&variant);
-    cout<<"Setting ptpZ to " << ptpZ <<" STATUS  : " << retvalSetEnable<<endl;
-    //UA_Variant_deleteMembers(&variant);
+    cout<<"ptpZ: " << ptpZ <<endl;
+    if(retvalSetEnable!=0)
+        cout<<" STATUS CODE  : " << retvalSetEnable<<endl;
 }
 
 void FestoMotionLibrary::setPTPVelo(double velo){
@@ -441,47 +600,220 @@ void FestoMotionLibrary::setPTPVelo(double velo){
     UA_StatusCode retvalSetEnable = UA_Client_writeValueAttribute(client,nodeID,&variant);
     cout<<"Setting PTP Velocity to " << velo <<" STATUS  : " << retvalSetEnable<<endl;
     //UA_Variant_deleteMembers(&variant);
+    emit ptpChanged(velo);
+
 }
+
+double FestoMotionLibrary::getPTPVelo(){
+    return ptpVelo;
+}
+
+void FestoMotionLibrary::setJogVelo(double velo){
+    UA_Variant variant;
+    UA_Variant_init(&variant);
+    char symJogVelo[] = "|var|CECC-X-M1.Application.GVL_Motion_INOUT.g_stIn.stDynJogInch.lrVel";
+    const UA_NodeId nodeID = UA_NODEID_STRING(2,symJogVelo);
+
+    UA_Variant_setScalar(&variant, &velo, &UA_TYPES[UA_TYPES_DOUBLE]);
+
+    UA_StatusCode retvalSetEnable = UA_Client_writeValueAttribute(client,nodeID,&variant);
+    jogVelo = velo;
+    cout<<"Setting Jog Velocity to " << velo <<" STATUS  : " << retvalSetEnable<<endl;
+    //UA_Variant_deleteMembers(&variant);
+
+}
+
+
+
 
 void FestoMotionLibrary::setPtpCoordinates(double coordinates[], double bStartValue, double ptpVeloIn){
     if(!readStartMotion()){
-        if(ptpVeloIn!=ptpVelo){
-            ptpVelo = ptpVeloIn;
-            setPTPVelo(ptpVelo);
-        }
-        startMotion(!bStartValue);
-        setPtpPosX(coordinates[0]);
-        setPtpPosY(coordinates[1]);
-        setPtpPosZ(coordinates[2]);
-
-        // set velocity
-
-
         if(isMoving()){
             cout<<" Already moving : Try later " <<endl;
         }
-        if(bStartValue){// if true
+        // Set PtP velocity
+        else{
 
-            cout<<"Start Motion" <<endl;
-            startPTPMotion();  // set xStart to true until ismoving is true
+            if(ptpVeloIn!=ptpVelo){
+               ptpVelo = ptpVeloIn;
+               setPTPVelo(ptpVelo);
+            }
+            startMotion(!bStartValue);
+            setPtpPosX(coordinates[0]);
+            setPtpPosY(coordinates[1]);
+            setPtpPosZ(coordinates[2]);
 
-            while(isMoving() && isBusy()){  // wait until isBusy return false.
-                // print axis values
+
+            if(bStartValue){// if true
+                cout<<"Start Position" <<endl;
                 getActualPosX();
                 getActualPosY();
-            }
+                cout<<" " <<endl;
 
-        cout<<"Motion Complete :  " <<endl;
-        stopPTPMotion(); // set xStart bit back to false
+                cout<<"Start Motion" <<endl;
+                startPTPMotion();  // set xStart to true until ismoving is true
+                //startMotion(true);
+                while(isMoving() && isBusy()){  // wait until isBusy return false.
+                      // print axis values
+                      getActualPosX();
+                      getActualPosY();
+                      cout<<"Emitting pos" <<endl;
+                      emit pos(posX,posY);
+                 }
 
+                    cout<<"Motion Complete :  " <<endl;
+
+                 //emit shoot(posX,posY);  // shoot Image
+                 //startMotion(false);
+                 stopPTPMotion(); // set xStart bit back to false
+             }
         }
-
     }
-
     else{
         cout<<"Start not set to false : Toggle start bit" <<endl;
         startMotion(false);
     }
 
+}
+
+
+void FestoMotionLibrary::jog(int axis,bool direction,bool toggle){
+
+    // Initialization of Jog Run - Check enable, homed, mode
+    if(mode!=30){
+
+             changeMOP(30);
+    }
+    changeAxis(axis);
+    if(toggle){ // motion. set true
+        cout<<"Start Jog" << endl;
+        if(direction)
+            movePositive(true);
+
+         else
+             moveNegative(true);
+    }
+    else{
+        cout<<"Stop Motion" <<endl;
+        if(direction)
+            movePositive(false);
+         else
+             moveNegative(false);
+    }
+    cout<<"Jog finished" <<endl;
 
 }
+void FestoMotionLibrary::checkSlot(){
+    cout<<"Got Recipe from Mainwindow" <<endl;
+}
+
+void FestoMotionLibrary::processRecipe(QString recipe){
+
+    cout<<"Got Recipe " << recipe.toStdString()<< " from Mainwindow" <<endl;
+    cout<<"Current Mode: " << mode <<endl;
+     changeMOP(50);
+    if(readJsonFile(recipe)){
+        runPoints();
+    }
+    //emit recipeFinished();
+
+}
+
+
+void FestoMotionLibrary::runPoints(){
+
+        changeMOP(50);
+    //cout<<"Got signal from mainwindow" <<endl;
+
+    // Initialization of PTP Run - Check enable, homed, mode
+    if(bIsEnabled && bHomed){
+        if(points.empty()){
+            cout<<"Json Points Empty" <<endl;
+        }
+        else{
+            // change to PTP
+
+            startMotion(false); // setting start to false
+
+            int pointsSize = points.size();
+            cout<<"Number of points " <<pointsSize << endl;
+
+            for(int index=0;index<pointsSize;index++){
+
+                double x = points[index]["x"].asDouble();
+                double y = points[index]["y"].asDouble();
+                double z = points[index]["z"].asDouble();
+                double ptpCoordinates[] =  {x,y,z};
+                cout<<"pX: " << ptpCoordinates[0]<<", pY: " <<ptpCoordinates[1]<<", pZ:  " << ptpCoordinates[2]<<endl;
+                setPtpCoordinates(ptpCoordinates,true,ptpVelo);
+            }
+            points.clear();
+        }
+
+    }
+
+    else
+        cout<<"System not enabled, or not homed" <<endl;
+    //emit finished(); // quit thread
+
+
+}
+
+void FestoMotionLibrary::run(){
+
+    cout<<"Festo Run" <<endl;
+}
+
+
+void FestoMotionLibrary::handleJog(int jogVal){
+
+    cout<<"Handling Jog"<< jogVal<<endl;
+//    if(jogVal==1){
+//        jog(1,true,true);  // start
+//    }
+//    if(jogVal==2){
+//        movePositive(false);  // stop
+
+//    }
+//    if(jogVal==3){
+//        jog(1,false,true);
+
+//    }
+//    if(jogVal==4){
+//        moveNegative(false);
+
+//    }
+
+    switch(jogVal){
+    case 1:  jog(1,true,true);  // start
+                 break;
+    case 2:  movePositive(false);  // stop
+                   break;
+    case 3:  jog(1,false,true);
+        break;
+    case 4: moveNegative(false);
+        break;
+    case 5: jog(2,true,true);
+            break;
+    case 6:   movePositive(false);
+            break;
+    case 7: jog(2,false,true);
+            break;
+    case 8: moveNegative(false);
+            break;
+    }
+
+
+
+
+
+}
+
+void FestoMotionLibrary::getJogHandle(int jogVal){
+    cout<<"Got Jog Signal" <<endl;
+    handleJog(jogVal);
+
+
+
+}
+
