@@ -7,6 +7,7 @@
 #include "qmessagebox.h"
 #include "IniFile.h"
 #include <iostream>
+#include "cameramessagehandler.h"
 
 
 
@@ -29,6 +30,15 @@ CameraThreadViewerGUI::CameraThreadViewerGUI(QWidget *parent) :
     ui->btnEndSave->setDisabled(true);
     ui->pauseButton->setVisible(false);
     qRegisterMetaType<std::string>("std::string");
+
+    msg_thread = new QThread(this);
+    camMsgHandler = new CameraMessageHandler();
+    camMsgHandler->moveToThread(msg_thread);
+    msg_thread->start();
+
+
+
+
 
     m_uDarkImgCounter = 0;
 
@@ -117,11 +127,16 @@ CameraThreadViewerGUI::CameraThreadViewerGUI(QWidget *parent) :
 
     m_Focuser = new Focuser(this);
     QObject::connect(m_Focuser,SIGNAL(moveFirgelli(uint)),this,SLOT(moveFirgelli(uint)));
+    //QObject::connect(this,SIGNAL(valueToFesto(uint)),camMsgHandler,SLOT(writeToFesto(uint)));
     QObject::connect(m_Focuser,SIGNAL(startImaging()),this,SLOT(startButtonPressed()));
     QObject::connect(m_Focuser,SIGNAL(focusOn(bool)),this,SLOT(focusingOn(bool)));
     QObject::connect(m_CameraBuffer,SIGNAL(newRawImg(std::string)),m_Focuser,SLOT(updateImage(std::string)));
     QObject::connect(m_Focuser,SIGNAL(bestFocus(uint)),this,SLOT(bestFocus(uint)));
-    QObject::connect(this,SIGNAL(zConfirmed()),m_Focuser,SIGNAL(confirmZ()));
+   //QObject::connect(this,SIGNAL(zConfirmed()),m_Focuser,SIGNAL(confirmZ()));
+
+    QObject::connect(camMsgHandler,SIGNAL(zConfirmed()),m_Focuser,SIGNAL(confirmZ()));
+
+
 
 
     QObject::connect(ui->sbFirgelliVal,SIGNAL(valueChanged(int)),this,SLOT(firgelliValueChanged(int)));
@@ -152,13 +167,20 @@ CameraThreadViewerGUI::CameraThreadViewerGUI(QWidget *parent) :
 
     bool bExternalMessages = ini.GetSetValue("Messaging", "ListenToExternalMessage", false, "Jos otetaan vastaan kuvauspyyntoja robottiohjelmata");
     if (bExternalMessages)
-    {
-        m_topic = new QMQTopicInterface("CamThreadViewer", "PW","CameraThreadViewer.ini");
-        QObject::connect(m_topic,SIGNAL(msg(QString,QByteArray)),this,SLOT(newMessage(QString,QByteArray)));
-        //m_topic->subscribe("EXTERNAL_SHOOT_COMMANDS");
-        m_topic->subscribe("ZAXIS_CONFIRMS");
-        m_topic->start();
-    }
+//    {
+//        m_topic = new QMQTopicInterface("CamThreadViewer", "PW","CameraThreadViewer.ini");
+//        QObject::connect(m_topic,SIGNAL(msg(QString,QByteArray)),this,SLOT(newMessage(QString,QByteArray)));
+//        //m_topic->subscribe("EXTERNAL_SHOOT_COMMANDS");
+//        m_topic->subscribe("ZAXIS_CONFIRMS");
+//        m_topic->start();
+//    }
+
+     m_topic = new QMQTopicInterface("CamThreadViewer", "PW","CameraThreadViewer.ini");
+//    qDebug()<<"Starting messaging client";
+//    QObject::connect(m_topic,SIGNAL(msg(QString,QByteArray)),this,SLOT(newMessage(QString,QByteArray)));
+//    //m_topic->subscribe("EXTERNAL_SHOOT_COMMANDS");
+//    m_topic->subscribe("ZAXIS_CONFIRMS");
+//    m_topic->start();
 
     if (ini.IsDirty())
         ini.Save();
@@ -397,14 +419,6 @@ void CameraThreadViewerGUI::focusTestPressed()
 
 void CameraThreadViewerGUI::moveFirgelli(uint value)
 {
-//    if (m_bUsingBeckhoff9050)
-//       // m_TwincatManager->set9050Value("Firgelli",61488,2,value);
-//   // else
-//    {
-//        std::cout << "Write firgelli " << m_qsFirgelliVariable.toStdString() << " : " << (qint16 )value << std::endl;
-//        //m_TwincatManager->setValue(m_qsFirgelliVariable,(qint16 )value);
-
-//    }
 
    // send message to castpro tool to move.
     QTime timer;
@@ -415,10 +429,11 @@ void CameraThreadViewerGUI::moveFirgelli(uint value)
     msg["type"] = "JSON";
     msg["name"] = "ZAXIS";
     msg["pos"] = value;
-
+    qDebug()<<"Writing message to FESTO";
     m_topic->writeMessage("ZAXIS_COMMANDS","",false,"JSON",msg.toStyledString().c_str(),msg.toStyledString().length(),100);
     int eTime = timer.elapsed();
     std::cout << "Message sent: " << eTime <<std::endl;
+
 
 
 
@@ -460,6 +475,19 @@ void CameraThreadViewerGUI::firgelliValueChanged(int iNewValue)
 void CameraThreadViewerGUI::bestFocus(uint value)
 {    
     ui->sbFirgelliVal->setValue(value);
+
+
+    std::cout<< "Sending message best Focus Z value"<<std::endl;
+
+    Json::Value msg;
+    //Json::Value array;
+    msg["type"] = "JSON";
+    msg["name"] = "ZAXIS_BEST";
+    msg["pos"] = value;
+    qDebug()<<"Writing best focus to FESTO";
+    m_topic->writeMessage("ZAXIS_COMMANDS","",false,"JSON",msg.toStyledString().c_str(),msg.toStyledString().length(),100);
+
+    std::cout << "Best focus sent: " <<std::endl;
 }
 
 void CameraThreadViewerGUI::imageSize(unsigned w, unsigned h, QString src)
@@ -529,8 +557,9 @@ void CameraThreadViewerGUI::doTimedFocus()
 void CameraThreadViewerGUI::newMessage(QString type, QByteArray data)
 {
     using namespace std;
-    cout<< "Got message in mq" << endl;
-    qDebug()<<"Got Message in GUI" ;
+    cout<<"got new message in CameraThreadViewer. Reading type:" << type.toStdString() <<endl;
+    qDebug()<<"Got Message in CTV" ;
+
     if (type == "EXTERNAL_SHOOT_COMMANDS")
     {
         Json::Value msg;
@@ -564,30 +593,29 @@ void CameraThreadViewerGUI::newMessage(QString type, QByteArray data)
         }
     }
 
-    // z AXIS CONFIRMS FROM CASTRO TOOL
-    if (type.toStdString() == "ZAXIS_CONFIRMS")
-    {
-        Json::Value msg;
-        Json::Reader reader;
-        cout<<"Reading Z Axis CONFIRMS" <<endl;
-        if(reader.parse(data.data(), msg))
-        {
-            //cout << data.data() << endl;
-            cout << msg["type"] << endl;
-            cout << msg["name"].asString() <<endl;
-            if (msg["name"].asString() == "ZMOTION_COMPLETED")   {
-                cout<<"Z Focus Motion confirmed" << endl;
-                emit zConfirmed();
-            }
-        }
-        else
-        {
-            QMessageBox msgBox;
-                msgBox.setText("Could not parse message." );
-                msgBox.exec();
-        }
+//    // z AXIS CONFIRMS FROM CASTRO TOOL
+//    if (type.toStdString() == "ZAXIS_CONFIRMS")
+//    {
+//        Json::Value msg;
+//        Json::Reader reader;
+//        cout<<"Reading Z Axis CONFIRMS" <<endl;
+//        if(reader.parse(data.data(), msg))
+//        {
+//            cout << data.data() << endl;
+//            if(msg["name"].asString() == "ZMOTION_COMPLETED"){
+//                    cout<<"Z Focus Motion confirmed" << endl;
+//                    qDebug()<< "Z Motion Confirmation RECIEVED";
+//                    emit zConfirmed();
+//                }
+//        }
+//        else
+//        {
+//            QMessageBox msgBox;
+//                msgBox.setText("Could not parse message." );
+//                msgBox.exec();
+//        }
 
-    }
+//    }
 
 
 }

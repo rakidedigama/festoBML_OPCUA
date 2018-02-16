@@ -43,7 +43,8 @@ SOURCES +=          main.cpp \
                      ../../CPPCommon/LedController.cpp \
                      lightcalibrator.cpp \
                      ../../CPPCommon/qmqtopicinterface.cpp \
-                    ../../CPPCommon/FileDownloader.cpp
+                    ../../CPPCommon/FileDownloader.cpp \
+    cameramessagehandler.cpp
 
 
 
@@ -62,7 +63,8 @@ HEADERS  +=         camerathreadviewergui.h \
                     ../../CPPCommon/LedController.h \
                     ../../CPPCommon/qmqtopicinterface.h \
                     ../../CPPCommon/BayerFilter.h \
-                    ../../CPPCommon/FileDownloader.h
+                    ../../CPPCommon/FileDownloader.h \
+    cameramessagehandler.h
 
 
 FORMS    +=         camerathreadviewergui.ui \

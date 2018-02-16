@@ -238,7 +238,7 @@ void Focuser::run()
 //        emit bestFocus(best.first - 20);
 
 //    Sleep(uFirgelliSleep*2);
-//    emit bestFocus(best.first);
+    emit bestFocus(best.first);
     emit focusOn(false);
     m_bStopRequested = false;
 }

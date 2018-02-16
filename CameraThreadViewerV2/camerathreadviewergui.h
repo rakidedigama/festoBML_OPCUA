@@ -23,6 +23,7 @@
 
 #include "QMQTopicInterface.h"
 #include "filedownloader.h"
+#include "cameramessagehandler.h"
 
 
 class ClickableLabel : public QLabel
@@ -73,7 +74,8 @@ private:
     Focuser *m_Focuser;
 
     LightCalibrator* m_lights;    
-
+    CameraMessageHandler* camMsgHandler;
+    QThread* msg_thread;
 
     unsigned        m_uCounter;
     bool            m_bInitializedOnce;
@@ -165,6 +167,7 @@ signals:
     void doLightsCalib( unsigned);
     void cancelLightsCalib();
     void zConfirmed();
+    void valueToFesto(uint);
 };
 
 #endif // CAMERATHREADVIEWERGUI_H
