@@ -33,6 +33,25 @@ void CameraMessageHandler::newMessage(QString type, QByteArray data){
                     qDebug()<< "Z Motion Confirmation RECIEVED";
                     emit zConfirmed();
                 }
+            if(msg["name"].asString() == "PTP_SHOOT"){
+                    cout<<"Got SHOOT msg" << endl;
+                    qDebug()<< "Got SHOOT msg";
+                    QStringList shootList;
+
+                    double x = msg["x"].asDouble();
+                    double y = msg["y"].asDouble();
+                    QString tag = QString::fromStdString(msg["tag"].asString());
+                    QString cLass = QString::fromStdString(msg["class"].asString());
+
+                    shootList.append(QString::number(x));
+                    shootList.append(QString::number(y));
+                    shootList.append(tag);
+                    shootList.append(cLass);
+
+
+
+                    emit shoot(shootList);
+                }
         }
     }
 }

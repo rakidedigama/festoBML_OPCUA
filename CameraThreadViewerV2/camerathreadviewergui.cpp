@@ -135,7 +135,7 @@ CameraThreadViewerGUI::CameraThreadViewerGUI(QWidget *parent) :
    //QObject::connect(this,SIGNAL(zConfirmed()),m_Focuser,SIGNAL(confirmZ()));
 
     QObject::connect(camMsgHandler,SIGNAL(zConfirmed()),m_Focuser,SIGNAL(confirmZ()));
-
+    QObject::connect(camMsgHandler,SIGNAL(shoot(QStringList)),this,SLOT(shootImage(QStringList)));
 
 
 
@@ -409,7 +409,7 @@ void CameraThreadViewerGUI::focusTestPressed()
     if (ui->pbFocus->text() == "Focus")
     {
         //m_Focuser->start();
-        QFuture<void> gsCameraThread = QtConcurrent::run(m_Focuser,&Focuser::doTargetedFocusTest);
+  //      QFuture<void> gsCameraThread = QtConcurrent::run(m_Focuser,&Focuser::doTargetedFocusTest);
                     //this, &CameraThreadViewerGUI::moveFirgelli, 15);//m_Focuser,&Focuser::run);
     }
     else
@@ -484,7 +484,7 @@ void CameraThreadViewerGUI::bestFocus(uint value)
     msg["type"] = "JSON";
     msg["name"] = "ZAXIS_BEST";
     msg["pos"] = value;
-    qDebug()<<"Writing best focus to FESTO";
+    qDebug()<<"Writing best focus to FESTO" << value;
     m_topic->writeMessage("ZAXIS_COMMANDS","",false,"JSON",msg.toStyledString().c_str(),msg.toStyledString().length(),100);
 
     std::cout << "Best focus sent: " <<std::endl;
@@ -552,6 +552,19 @@ void CameraThreadViewerGUI::doTimedFocus()
 {
     if (!m_bFocusing)
         ui->btnFocusTest->animateClick();
+}
+
+void CameraThreadViewerGUI::shootImage(QStringList list){
+    qDebug()<< "Getting shoot values";
+    bool ok = false;
+
+    double x = (list.at(0)).toDouble(&ok);
+    double y = (list.at(1)).toDouble(&ok);
+    QString tag = list.at(2);
+    QString cLass = list.at(2);
+
+    m_CameraBuffer->saveOne(x,y,tag, cLass);
+
 }
 
 void CameraThreadViewerGUI::newMessage(QString type, QByteArray data)

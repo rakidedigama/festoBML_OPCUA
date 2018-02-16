@@ -18,6 +18,7 @@ public slots:
     void writeToFesto(uint value);
 signals:
     void zConfirmed();
+    void shoot(QStringList list);
 };
 
 #endif // CAMERAMESSAGEHANDLER_H

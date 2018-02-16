@@ -30,7 +30,7 @@ void Focuser::run()
 
     unsigned uFirgelliValueStart = ini.GetSetValue("Focusing","FirgelliStart",20,"Firgelli start point");
     unsigned uFirgelliValueEnd = ini.GetSetValue("Focusing","FirgelliEnd",60,"Firgelli end point");
-    unsigned uFirgelliInterval = ini.GetSetValue("Focusing","FirgelliInterval",10,"Firgelli move interval");
+    double uFirgelliInterval = ini.GetSetValue("Focusing","FirgelliInterval",10,"Firgelli move interval");
     unsigned uFirgelliSteps = ((uFirgelliValueEnd - uFirgelliValueStart)/uFirgelliInterval) + 1;
 
     unsigned uFirgelliSleep = ini.GetSetValue("Focusing","FirgelliSleep",1000,"Firgelli sleep ms");
@@ -56,13 +56,13 @@ void Focuser::run()
     if (ini.IsDirty())
         ini.Save();
 
-    std::vector<std::pair<unsigned,double>> firgelliPositions;
+    std::vector<std::pair<double,double>> firgelliPositions;
 
     if (!bReversed)
     {
         for (int i = 0; i < uFirgelliSteps; i++)
         {
-            std::pair<unsigned,unsigned>  pari;
+            std::pair<double,unsigned>  pari;
             pari.first = (uFirgelliInterval*i) + uFirgelliValueStart;
             pari.second = 0;
             firgelliPositions.push_back(pari);
@@ -72,7 +72,7 @@ void Focuser::run()
     {
         for (int i = 0; i < uFirgelliSteps; i++)
         {
-            std::pair<unsigned,unsigned>  pari;
+            std::pair<double,unsigned>  pari;
             pari.first = uFirgelliValueEnd - (uFirgelliInterval*i);
             pari.second = 0;
             firgelliPositions.push_back(pari);
@@ -246,7 +246,7 @@ void Focuser::run()
 
 
 
-void Focuser::doTargetedFocusTest()
+/*void Focuser::doTargetedFocusTest()
 {
     IniFile ini("CameraThreadViewer.ini");
     bool bMetricFirgelli = ini.GetSetValue("Focusing", "MetricValues", false, "New focusing system mm");
@@ -255,8 +255,9 @@ void Focuser::doTargetedFocusTest()
     else
         doTargetedFocusTestFirgelli();
 
-}
+}*/
 
+/*
 void Focuser::doTargetedFocusTestFirgelli()
 {
     emit focusOn(true);
@@ -281,12 +282,12 @@ void Focuser::doTargetedFocusTestFirgelli()
 
     m_sSaveFolder = ini.GetSetValue("Focusing","SaveFolder", "C:\\temp","");
 
-  /*
-   * Pitas olla jo kuvan headerissa
-    unsigned uBitShift = ini.GetSetValue("Images", "Bitshift", 4, "Imperx 10bit = 2, Basler 12bit = 4");
-    unsigned uBayerPattern = ini.GetSetValue("Images", "Bayer", 2, "2 = RGGB (Imperx), 1 = GRBG (Basler)");
-    unsigned uBitDepth = ini.GetSetValue("Images", "Depth", 10, "Imperx 10, Basler 12");
-*/
+//
+//   * Pitas olla jo kuvan headerissa
+//    unsigned uBitShift = ini.GetSetValue("Images", "Bitshift", 4, "Imperx 10bit = 2, Basler 12bit = 4");
+//    unsigned uBayerPattern = ini.GetSetValue("Images", "Bayer", 2, "2 = RGGB (Imperx), 1 = GRBG (Basler)");
+//    unsigned uBitDepth = ini.GetSetValue("Images", "Depth", 10, "Imperx 10, Basler 12");
+//
     if (ini.IsDirty())
         ini.Save();
 
@@ -448,14 +449,14 @@ void Focuser::doTargetedFocusTestFirgelli()
 
 
                 }
-              /*  else
-                {
-                    if (pHeader->m_dTime >= 0)
-                        logFocus.Log(StringBuilder()  << "Focuser: Image too old..."  << Time(pHeader->m_dTime).ToExtendedISO());
-                    else
-                        logFocus.Log(StringBuilder()  << "Focuser: Image too old... dtime nan");
-                    uImagesFailed++;
-                }*/
+//              /*  else
+//                {
+//                    if (pHeader->m_dTime >= 0)
+//                        logFocus.Log(StringBuilder()  << "Focuser: Image too old..."  << Time(pHeader->m_dTime).ToExtendedISO());
+//                    else
+//                        logFocus.Log(StringBuilder()  << "Focuser: Image too old... dtime nan");
+//                    uImagesFailed++;
+//                }
             }
 
             if (uImagesFailed >= uImagesToShoot-1)
@@ -515,8 +516,9 @@ void Focuser::doTargetedFocusTestFirgelli()
 
     m_bStopRequested = false;
 
-}
+}*/
 
+/*
 void Focuser::doTargetedFocusTestMetric()
 {
     emit focusOn(true);
@@ -541,12 +543,12 @@ void Focuser::doTargetedFocusTestMetric()
 
     m_sSaveFolder = ini.GetSetValue("Focusing","SaveFolder", "C:\\temp","");
 
-  /*
-   * Pitas olla jo kuvan headerissa
-    unsigned uBitShift = ini.GetSetValue("Images", "Bitshift", 4, "Imperx 10bit = 2, Basler 12bit = 4");
-    unsigned uBayerPattern = ini.GetSetValue("Images", "Bayer", 2, "2 = RGGB (Imperx), 1 = GRBG (Basler)");
-    unsigned uBitDepth = ini.GetSetValue("Images", "Depth", 10, "Imperx 10, Basler 12");
-*/
+//  /*
+//   * Pitas olla jo kuvan headerissa
+//    unsigned uBitShift = ini.GetSetValue("Images", "Bitshift", 4, "Imperx 10bit = 2, Basler 12bit = 4");
+//    unsigned uBayerPattern = ini.GetSetValue("Images", "Bayer", 2, "2 = RGGB (Imperx), 1 = GRBG (Basler)");
+//    unsigned uBitDepth = ini.GetSetValue("Images", "Depth", 10, "Imperx 10, Basler 12");
+//
     if (ini.IsDirty())
         ini.Save();
 
@@ -708,14 +710,14 @@ void Focuser::doTargetedFocusTestMetric()
 
 
                 }
-              /*  else
-                {
-                    if (pHeader->m_dTime >= 0)
-                        logFocus.Log(StringBuilder()  << "Focuser: Image too old..."  << Time(pHeader->m_dTime).ToExtendedISO());
-                    else
-                        logFocus.Log(StringBuilder()  << "Focuser: Image too old... dtime nan");
-                    uImagesFailed++;
-                }*/
+//              /*  else
+//                {
+//                    if (pHeader->m_dTime >= 0)
+//                        logFocus.Log(StringBuilder()  << "Focuser: Image too old..."  << Time(pHeader->m_dTime).ToExtendedISO());
+//                    else
+//                        logFocus.Log(StringBuilder()  << "Focuser: Image too old... dtime nan");
+//                    uImagesFailed++;
+//                }
             }
 
             if (uImagesFailed >= uImagesToShoot-1)
@@ -775,7 +777,7 @@ void Focuser::doTargetedFocusTestMetric()
 
     m_bStopRequested = false;
 
-}
+} */
 
 void Focuser::cancelFocusing()
 {

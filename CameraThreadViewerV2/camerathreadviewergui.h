@@ -130,6 +130,8 @@ public slots:
 
     void snapPressed();
     void moveFirgelli(uint);
+
+    void shootImage(QStringList list);
 private slots:
     void saveFolderDoubleClick();
     void saveFolderTimeout();

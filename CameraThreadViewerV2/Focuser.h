@@ -50,9 +50,9 @@ public:
     explicit Focuser(QObject *parent = 0);
     ~Focuser();
     virtual void run();
-    void doTargetedFocusTest();
-    void doTargetedFocusTestFirgelli();
-    void doTargetedFocusTestMetric();
+//    void doTargetedFocusTest();
+//    void doTargetedFocusTestFirgelli();
+//    void doTargetedFocusTestMetric();
 signals:
     void moveFirgelli(uint value);
     void startImaging();
