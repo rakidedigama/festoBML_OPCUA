@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/images">
+        <file alias="recbtn">recbutton.ico</file>
+    </qresource>
+</RCC>

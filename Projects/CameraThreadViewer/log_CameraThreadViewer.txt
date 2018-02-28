@@ -1,0 +1,31 @@
+2018-02-12T09_59_11_458: Starting camerathreadviewer
+2018-02-12T09_59_14_398: Sending message Z axis
+2018-02-12T12_50_32_389: Starting camerathreadviewer
+2018-02-12T13_03_22_007: Starting camerathreadviewer
+2018-02-12T13_03_22_010: Creating focuser
+2018-02-12T13_03_27_153: Started Focussing
+2018-02-12T13_03_27_162: Startgin logger logfocus
+2018-02-12T13_07_06_621: Starting camerathreadviewer
+2018-02-12T13_07_06_625: Creating focuser
+2018-02-12T13_07_10_175: Started Focussing
+2018-02-12T13_07_10_180: Starting logger
+2018-02-12T13_08_58_638: Started Focussing
+2018-02-12T13_08_58_644: Starting logger
+2018-02-12T13_10_29_028: Starting camerathreadviewer
+2018-02-12T13_10_29_032: Creating focuser
+2018-02-12T13_10_33_469: Started Focussing
+2018-02-12T13_13_19_486: Starting camerathreadviewer
+2018-02-12T13_13_19_492: Creating focuser
+2018-02-12T13_13_25_453: Started Focussing
+2018-02-12T13_16_16_774: Starting camerathreadviewer
+2018-02-12T13_16_16_779: Creating focuser
+2018-02-12T13_16_19_435: Started Focussing
+2018-02-12T13_25_11_463: Starting camerathreadviewer
+2018-02-12T13_25_11_467: Creating focuser
+2018-02-12T13_28_22_098: Starting camerathreadviewer
+2018-02-12T13_28_22_104: Creating focuser
+2018-02-12T13_29_06_071: Sending message Z axis
+2018-02-12T13_34_19_194: Starting camerathreadviewer
+2018-02-12T13_34_19_197: Creating focuser
+2018-02-13T10_53_22_949: Starting camerathreadviewer
+2018-02-13T10_53_22_953: Creating focuser
