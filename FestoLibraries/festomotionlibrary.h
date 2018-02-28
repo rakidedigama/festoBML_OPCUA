@@ -5,7 +5,7 @@
 #include <QObject>
 #include <QThread>
 #include "json.h"
-
+#include "qmqtopicinterface.h"
 class FestoMotionLibrary : public QObject
 {
     Q_OBJECT
@@ -16,6 +16,7 @@ protected:
 public:
 
     FestoMotionLibrary(QObject* parent = 0);
+    QMQTopicInterface* m_topic;
 
 
     //~FestoMotionLibrary();
@@ -68,7 +69,7 @@ public:
     void runPoints();
 
     // Other functions
-    void handleJog(int jogV);
+
     bool readJsonFile(QString recipe);
     void parseJsonPointsFromFile(Json::Value *pPoints);
 
@@ -94,6 +95,9 @@ public:
 
     double ptpVelo;
     double jogVelo;
+    double focusVelo;
+    double recipeVelo;
+    QString recipeRefTag;
     Json::Value points;
 
 
@@ -108,14 +112,21 @@ signals:
      void recipeFinished();
     void sigUpdatePosition();
       void ptpChanged(double);
+      void ZMotionComplete();
 
 private slots:
   void updatePosition();
+  void sendZConfirmMsg();  // AMQP Message
+  void sendShootMsg();
 
 public slots:
+  // called from outside, mostly from cast pro Tool
     void processRecipe(QString recipe);
-    void getJogHandle(int jogVal);
-
+    //void getJogHandle(int jogVal);
+    void handleJog(int jogV);
+    void triggerSystemEnable();
+    void moveZtoFocus(double zp);
+    void getSampleRefTag(QString refTag);
 
 };
 

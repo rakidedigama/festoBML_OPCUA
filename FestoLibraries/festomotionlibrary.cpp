@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <cstdint>
 #include "json.h"
+#include "qmqtopicinterface.h"
 
 using namespace std;
 
@@ -19,10 +20,13 @@ FestoMotionLibrary::FestoMotionLibrary( QObject* parent)
    //runPointsReady = false;
 
    ptpPointsFromFileReady  = false;
+   recipeVelo = 20;
    ptpVelo = 20; // default velo
    jogVelo = 20;
+   focusVelo = 2;
    mode = 50; // default ptp
   QObject::connect(this,SIGNAL(sigUpdatePosition()),this,SLOT(updatePosition()));
+  m_topic = new QMQTopicInterface("Festo", "PW","CastProTool.ini");
 
 
 }
@@ -44,6 +48,14 @@ void FestoMotionLibrary::connectPLC(UA_Client *someClient){
 
 void FestoMotionLibrary::initialize()
 {
+    cout<<"Initial Mode:" << viewMOP()<<endl;
+    if(viewMOP()==0){
+         cout<<"Start Configuration" <<endl;
+         changeMOP(10);
+         if(viewMOP()==10)
+                cout<<"Configuration successful" <<endl;
+    }
+
 
     //emit threadRunning(true);
     //System Initialization
@@ -61,7 +73,16 @@ void FestoMotionLibrary::initialize()
     }
     setPTPVelo(ptpVelo);
     setJogVelo(jogVelo);
+    cout<<"System MOP" << viewMOP()<<endl;
 
+}
+
+void FestoMotionLibrary::triggerSystemEnable()
+{
+    if(isEnabled())
+        setEnable(false);
+    else
+        setEnable(true);
 }
 
 
@@ -453,7 +474,7 @@ double FestoMotionLibrary::getActualPosY(){
     if(retvalReadEnabled == UA_STATUSCODE_GOOD && UA_Variant_hasScalarType(&variant,&UA_TYPES[UA_TYPES_DOUBLE])) {
 
         outValue = *(UA_Double*)variant.data;
-        cout<<", cY: " << outValue << endl ;
+        cout<<", cY: " << outValue ;
         posY = outValue;
 
     }
@@ -477,7 +498,7 @@ double FestoMotionLibrary::getActualPosZ(){
 
         outValue = *(UA_Double*)variant.data;
         posZ = outValue;
-        //cout<<"Reading actualPositionZ: " << outValue << endl ;;
+       cout<<"cZ: " << outValue << endl ;;
 
     }
     else{
@@ -657,13 +678,14 @@ void FestoMotionLibrary::setPtpCoordinates(double coordinates[], double bStartVa
                       // print axis values
                       getActualPosX();
                       getActualPosY();
+                      getActualPosZ();
                       cout<<"Emitting pos" <<endl;
                       emit pos(posX,posY);
                  }
 
                     cout<<"Motion Complete :  " <<endl;
 
-                 //emit shoot(posX,posY);  // shoot Image
+                 /*emit shoot(posX,posY);  */// shoot Image
                  //startMotion(false);
                  stopPTPMotion(); // set xStart bit back to false
              }
@@ -680,7 +702,8 @@ void FestoMotionLibrary::setPtpCoordinates(double coordinates[], double bStartVa
 void FestoMotionLibrary::jog(int axis,bool direction,bool toggle){
 
     // Initialization of Jog Run - Check enable, homed, mode
-    if(mode!=30){
+
+    if(viewMOP()!=30){
 
              changeMOP(30);
     }
@@ -705,6 +728,63 @@ void FestoMotionLibrary::jog(int axis,bool direction,bool toggle){
 }
 void FestoMotionLibrary::checkSlot(){
     cout<<"Got Recipe from Mainwindow" <<endl;
+}
+
+void FestoMotionLibrary::moveZtoFocus(double Zp){
+    double x = getActualPosX();
+    double y = getActualPosY();
+    double ptpCoordinates[] =  {x,y,Zp};
+    cout<< " Moving Camera to Focus : " << " pX: " << ptpCoordinates[0]<<", pY: " <<ptpCoordinates[1]<<", pZ:  " << ptpCoordinates[2]<<endl;
+    changeMOP(50);
+    setPtpCoordinates(ptpCoordinates,true,focusVelo);
+    if(abs(Zp - getActualPosZ())< 0.1){ // close enough
+        cout<<"Z Focus Motion Complete in FESTO: " << endl;
+        //emit ZMotionComplete();
+        sendZConfirmMsg();
+    }
+
+}
+
+void FestoMotionLibrary::sendZConfirmMsg(){
+        std::cout<<"Writing Z AXIS confirmation message in FESTO" <<endl;
+        Json::Value msg;
+        //Json::Value array;
+        msg["type"] = "JSON";
+        msg["name"] = "ZMOTION_COMPLETED";
+        msg["tag"] = "MOTION_COMPLETED";
+       // qDebug()<<"Sending confirmation message in FESTO";
+       m_topic->writeMessage("ZAXIS_CONFIRMS","",false,"JSON",msg.toStyledString().c_str(),msg.toStyledString().length(),100);
+        std::cout << "Message sent from Festo " << std::endl;
+
+}
+void FestoMotionLibrary::getSampleRefTag(QString refTag){
+    recipeRefTag = refTag;
+}
+
+void FestoMotionLibrary::sendShootMsg(){
+    std::cout<<"Writing SHOOT message in FESTO" <<endl;
+    Json::Value msg;
+    //Json::Value array;
+    msg["type"] = "JSON";
+    msg["name"] = "PTP_SHOOT";
+    msg["tag"] = recipeRefTag.toStdString();
+   /* if (ui->rbRaw->isChecked())
+        msg["class"] = "Raw";
+    if (ui->rbPe->isChecked())
+        msg["class"] = "PE";
+    if (ui->rbPrinted->isChecked())
+        msg["class"] = "Printed"; */
+    msg["class"] = "Printed";
+    msg["x"] = getActualPosX();
+    msg["y"] = getActualPosY();
+
+   m_topic->writeMessage("ZAXIS_CONFIRMS","",false,"JSON",msg.toStyledString().c_str(),msg.toStyledString().length(),100);
+    std::cout << "SHOOT Message sent from Festo " << std::endl;
+
+
+
+
+
 }
 
 void FestoMotionLibrary::processRecipe(QString recipe){
@@ -745,7 +825,9 @@ void FestoMotionLibrary::runPoints(){
                 double z = points[index]["z"].asDouble();
                 double ptpCoordinates[] =  {x,y,z};
                 cout<<"pX: " << ptpCoordinates[0]<<", pY: " <<ptpCoordinates[1]<<", pZ:  " << ptpCoordinates[2]<<endl;
-                setPtpCoordinates(ptpCoordinates,true,ptpVelo);
+                setPtpCoordinates(ptpCoordinates,true,recipeVelo);
+                //emit shoot(posX,posY);
+                sendShootMsg();
             }
             points.clear();
         }
@@ -768,21 +850,7 @@ void FestoMotionLibrary::run(){
 void FestoMotionLibrary::handleJog(int jogVal){
 
     cout<<"Handling Jog"<< jogVal<<endl;
-//    if(jogVal==1){
-//        jog(1,true,true);  // start
-//    }
-//    if(jogVal==2){
-//        movePositive(false);  // stop
 
-//    }
-//    if(jogVal==3){
-//        jog(1,false,true);
-
-//    }
-//    if(jogVal==4){
-//        moveNegative(false);
-
-//    }
 
     switch(jogVal){
     case 1:  jog(1,true,true);  // start
@@ -801,6 +869,15 @@ void FestoMotionLibrary::handleJog(int jogVal){
             break;
     case 8: moveNegative(false);
             break;
+    case 9:  jog(3,true,true);  // start
+                 break;
+    case 10:  movePositive(false);  // stop
+                   break;
+    case 11:  jog(3,false,true);
+        break;
+    case 12: moveNegative(false);
+        break;
+
     }
 
 
@@ -809,11 +886,11 @@ void FestoMotionLibrary::handleJog(int jogVal){
 
 }
 
-void FestoMotionLibrary::getJogHandle(int jogVal){
-    cout<<"Got Jog Signal" <<endl;
-    handleJog(jogVal);
+//void FestoMotionLibrary::getJogHandle(int jogVal){
+//    cout<<"Got Jog Signal" <<endl;
+//    handleJog(jogVal);
 
 
 
-}
+//}
 
