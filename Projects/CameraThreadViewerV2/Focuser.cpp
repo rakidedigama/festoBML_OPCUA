@@ -221,7 +221,7 @@ void Focuser::run()
         zConfirmed = false;
     }
 
-    std::pair <uint,double> best;
+    std::pair <double,double> best;
     best.second = 0;
 
     for (int h = 0; h < firgelliPositions.size(); h++)
@@ -238,6 +238,7 @@ void Focuser::run()
 //        emit bestFocus(best.first - 20);
 
 //    Sleep(uFirgelliSleep*2);
+    qDebug()<<"BEST FOCUS IN FOCUSSER: " << best.first;
     emit bestFocus(best.first);
     emit focusOn(false);
     m_bStopRequested = false;

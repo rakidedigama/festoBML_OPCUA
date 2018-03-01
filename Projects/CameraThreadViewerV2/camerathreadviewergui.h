@@ -129,7 +129,7 @@ public slots:
     void snapMsg(QString);
 
     void snapPressed();
-    void moveFirgelli(uint);
+    void moveFirgelli(double);
 
     void shootImage(QStringList list);
 private slots:
@@ -144,7 +144,7 @@ private slots:
 
     void firgelliValueChanged(int);
 
-    void bestFocus(uint);
+    void bestFocus(double);
 
     void imageSize(unsigned, unsigned, QString);
 

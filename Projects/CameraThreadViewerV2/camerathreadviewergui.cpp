@@ -126,12 +126,12 @@ CameraThreadViewerGUI::CameraThreadViewerGUI(QWidget *parent) :
 
 
     m_Focuser = new Focuser(this);
-    QObject::connect(m_Focuser,SIGNAL(moveFirgelli(uint)),this,SLOT(moveFirgelli(uint)));
+    QObject::connect(m_Focuser,SIGNAL(moveFirgelli(double)),this,SLOT(moveFirgelli(double)));
     //QObject::connect(this,SIGNAL(valueToFesto(uint)),camMsgHandler,SLOT(writeToFesto(uint)));
     QObject::connect(m_Focuser,SIGNAL(startImaging()),this,SLOT(startButtonPressed()));
     QObject::connect(m_Focuser,SIGNAL(focusOn(bool)),this,SLOT(focusingOn(bool)));
     QObject::connect(m_CameraBuffer,SIGNAL(newRawImg(std::string)),m_Focuser,SLOT(updateImage(std::string)));
-    QObject::connect(m_Focuser,SIGNAL(bestFocus(uint)),this,SLOT(bestFocus(uint)));
+    QObject::connect(m_Focuser,SIGNAL(bestFocus(double)),this,SLOT(bestFocus(double)));
    //QObject::connect(this,SIGNAL(zConfirmed()),m_Focuser,SIGNAL(confirmZ()));
 
     QObject::connect(camMsgHandler,SIGNAL(zConfirmed()),m_Focuser,SIGNAL(confirmZ()));
@@ -417,7 +417,7 @@ void CameraThreadViewerGUI::focusTestPressed()
 
 }
 
-void CameraThreadViewerGUI::moveFirgelli(uint value)
+void CameraThreadViewerGUI::moveFirgelli(double value)
 {
 
    // send message to castpro tool to move.
@@ -429,7 +429,7 @@ void CameraThreadViewerGUI::moveFirgelli(uint value)
     msg["type"] = "JSON";
     msg["name"] = "ZAXIS";
     msg["pos"] = value;
-    qDebug()<<"Writing message to FESTO";
+    qDebug()<<"Writing MOVE message to FESTO : " << value;
     m_topic->writeMessage("ZAXIS_COMMANDS","",false,"JSON",msg.toStyledString().c_str(),msg.toStyledString().length(),100);
     int eTime = timer.elapsed();
     std::cout << "Message sent: " << eTime <<std::endl;
@@ -472,7 +472,7 @@ void CameraThreadViewerGUI::firgelliValueChanged(int iNewValue)
 //        m_TwincatManager->setValue(m_qsFirgelliVariable,(qint16 )iNewValue);
 }
 
-void CameraThreadViewerGUI::bestFocus(uint value)
+void CameraThreadViewerGUI::bestFocus(double value)
 {    
     ui->sbFirgelliVal->setValue(value);
 

@@ -54,11 +54,11 @@ public:
 //    void doTargetedFocusTestFirgelli();
 //    void doTargetedFocusTestMetric();
 signals:
-    void moveFirgelli(uint value);
+    void moveFirgelli(double value);
     void startImaging();
     void focusOn(bool);
 
-    void bestFocus(uint);
+    void bestFocus(double);
       void confirmZ();
 public slots:
 

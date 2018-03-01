@@ -29,14 +29,15 @@ void MessageHandler::newMessage(QString type, QByteArray data){
         {
             // from Focusser, trigger Festo to move
             if(msg["name"].asString() == "ZAXIS"){
+                cout<< data.data() <<endl;
                std::string zposStr = msg["pos"].asString();
-               double zPos = double( std::stoi (zposStr,nullptr,10));
+               double zPos = double( std::stod(zposStr,nullptr));
                cout<<"Message from Focusser, move Zaxis :" << zPos << endl;
                emit moveCamToFocus(zPos);
             }
             if(msg["name"].asString() == "ZAXIS_BEST"){
                std::string zposStr = msg["pos"].asString();
-               double zPos = double( std::stoi (zposStr,nullptr,10));
+               double zPos = double( std::stod (zposStr,nullptr));
                cout<<"Got best focus from Focusser:" << zPos << endl;
                emit moveCamToFocus(zPos);
             }
