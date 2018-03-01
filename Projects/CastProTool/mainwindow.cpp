@@ -93,7 +93,8 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->lblRecipe->setText(currentRecipe);
 
     QObject::connect(ui->btnSelect,SIGNAL(pressed()),this,SLOT(recipeSelection()));
-    QObject::connect(ui->btnStop,SIGNAL(pressed()),this,SLOT(stopPressed()));
+    QObject::connect(ui->btnStop,SIGNAL(pressed()),this,SLOT(stopRecipePressed()));
+
 
     ui->btnStop->setEnabled(false);
     //QObject::connect(ui->coordinates,SIGNAL(moveTo(QPointF)),this,SLOT(moveRobotTo(QPointF)));
@@ -225,6 +226,10 @@ void MainWindow::runRecipe()
         ini.Save();
 }
 
+void MainWindow::stopRecipePressed(){
+    fRobot->stopRecipe();
+}
+
 void MainWindow::readJsonFile(QString recipe){
     using namespace std;
 
@@ -335,13 +340,13 @@ void MainWindow::recipeSelection()
 
 }
 
-void MainWindow::stopPressed()
-{
+//void MainWindow::stopPressed()
+//{
 
-    m_thread->quit();
-    //fRobot->abort(true);
+//    //m_thread->quit();
+//    //fRobot->abort(true);
 
-}
+//}
 
 void MainWindow::moveRobotTo(QPointF p)
 {

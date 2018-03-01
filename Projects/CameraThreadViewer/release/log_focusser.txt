@@ -1,9 +1,0 @@
-2018-02-14T14_17_07_068: Focussing constructor
-2018-02-14T14_17_07_075: Starting camerathreadviewer
-2018-02-14T14_17_07_082: Creating focuser
-2018-02-14T14_21_09_760: Focussing constructor
-2018-02-14T14_21_09_765: Starting camerathreadviewer
-2018-02-14T14_21_09_769: Creating focuser
-2018-02-14T14_21_11_740: Sending message Z axis
-2018-02-14T14_21_11_751: Message sent: 8
-2018-02-14T14_21_21_757: starting Grabber from Focuser

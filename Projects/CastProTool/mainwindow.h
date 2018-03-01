@@ -81,25 +81,19 @@ private slots:
     void msg(QString);
 
     void recipeSelection();
-    void stopPressed();
+
 
     void moveRobotTo(QPointF);
-
     void stepSizeChanged(double);
-
     void ptpVelocityChanged(int);
-
     void rbChanged();
-
     void moving(bool);
-
     void recipeDone();
-
     void calcToggled(bool);
-
     void joggingMode();
-
     void newMessage(QString, QByteArray); // from msg queue
+    void stopRecipePressed();
+//    void stopRecipe();
 
 
     void on_pushButton_clicked();
